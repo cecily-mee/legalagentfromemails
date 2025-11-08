@@ -11,9 +11,9 @@ Legal teams are often a bottleneck in business operations, buried under a consta
 This agent acts as a "digital paralegal" that monitors the inbox 24/7. It autonomously ingests and understands every new request, using AI to decide the correct course of action.
 
 * **For queries & reviews:** It uses **Retrieval-Augmented Generation (RAG)** to query an internal knowledge base of legal playbooks, then drafts a complete email reply.
-* **For contract drafts:** It uses a separate RAG system to find the correct legal template, intelligently fills it with data from the email, and saves the final draft to a database.
+* **For contract drafts:** It uses a separate RAG system to find the correct legal template, intelligently fills it with data from the email, and saves the final draft to a database which then appears on a dashboard.
 
-The legal expert's job is now simply to approve the drafted email or review the generated contract on a dashboard, saving hours of manual work.
+The legal expert's job is now simply to approve the drafted email which appears on the dashbaord or review the generated contract on a dashboard, saving hours of manual work.
 
 ## ✨ Key Features
 
@@ -29,10 +29,8 @@ The legal expert's job is now simply to approve the drafted email or review the 
 
 The system is built as a state machine using LangGraph.
 
-*(You can add a diagram of your workflow here, e.g., `![Workflow Diagram](docs/workflow.png)`)*
-
 1.  **Fetch:** The `GmailToolsClass` fetches unread emails.
-2.  **Extract:** The tool extracts the email body. Crucially, it also finds all PDF attachments, decodes them, and uses `pdf2image` to convert **every page into a base64-encoded image**.
+2.  **Extract:** The tool extracts the email body. Crucially, it also finds all PDF attachments and extracts them too.
 3.  **Categorize:** The email text and all attachment images are sent to the `categorize_email` agent (Gemini). This multimodal agent determines the user's true intent and classifies the email.
 4.  **Route:** The LangGraph workflow routes the task based on its category.
     * **Path A: Legal Query / Contract Review**
@@ -45,7 +43,7 @@ The system is built as a state machine using LangGraph.
         * The task is routed to the `generate_contract_from_email` node.
         * This node uses the `ContractRAGAgent`, which queries a **Pinecone** vector store (containing contract templates) to find the relevant template.
         * The agent generates a complete contract, filling in details from the email.
-        * The final contract is saved to **MongoDB**.
+        * The final contract is saved to **MongoDB** which then appears on a text editor on the dashboar.
     * **Path C: Unrelated**
         * The email is marked as read and skipped.
 5.  **Review (HITL):** The `api_server.py` (FastAPI) serves the generated contracts from MongoDB, allowing a legal expert to review, edit, and export them as PDFs from a web dashboard.
