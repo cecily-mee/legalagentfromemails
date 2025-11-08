@@ -1,4 +1,4 @@
-# Autonomous Legal AI Agent
+# Autonomous Zero Draft Legal AI Agent
 
 This project is an autonomous AI agent built with **LangGraph** and **multimodal LLMs** (Google Gemini) to automate a legal team's email inbox. The system reads new emails, understands both text and PDF attachments, triages requests, and automates responses—transforming the legal expert's role from a manual drafter to an **expert reviewer**.
 
@@ -87,3 +87,42 @@ source venv/bin/activate
 
 # Install dependencies (create a requirements.txt file)
 pip install -r requirements.txt
+
+### 3. Environment Setup
+
+Create a `.env` file in the root directory and add your API keys
+
+### 4. Google Gmail API Setup
+
+1.  Go to your Google Cloud Console.
+2.  Enable the **Gmail API**.
+3.  Create OAuth 2.0 Client IDs credentials.
+4.  Download the JSON file and rename it `credentials.json` in the root of your project.
+5.  The first time you run `main.py`, you will be prompted to authenticate in your browser. This will create a `token.json` file.
+
+### 5. Populate Knowledge Bases
+
+1.  **ChromaDB (Legal Playbooks):**
+    * Add your internal legal documents, FAQs, etc., to `data/agency.txt`.
+    * Run the `create_index.py` script to build the ChromaDB vector store:
+        ```bash
+        python create_index.py
+        ```
+2.  **Pinecone (Contract Templates):**
+    * Place all your `.pdf` contract templates (e.g., `NDA-Template.pdf`, `MSA-Template.pdf`) inside the `documents/` folder.
+    * The `ContractRAGAgent` will automatically load and embed these into your Pinecone index the first time it's initialized (in `main.py`).
+
+### 6. Run the Application
+
+This system has multiple services. You should run them in separate terminal tabs.
+
+**Tab 1: Run the main LangGraph Agent**
+This will start the agent, which will begin monitoring your inbox.
+
+```bash
+# (Make sure venv is active)
+python main.py
+
+**Tab 2: Run the FastAPI Dashboard API This server provides the backend for the legal expert's review dashboard.
+```bash
+uvicorn api_server:app --reload --port 8080
