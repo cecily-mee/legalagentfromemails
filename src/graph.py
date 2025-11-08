@@ -38,9 +38,11 @@ class Workflow():
             "categorize_email",
             nodes.route_email_based_on_category,
             {
-                "product related": "construct_rag_queries",
-                "not product related": "email_writer", # Feedback or Complaint
-                "unrelated": "skip_unrelated_email"
+                "contract draft request": "construct_rag_queries",
+                "contract review": "construct_rag_queries",
+                "legal query": "construct_rag_queries",
+                "unrelated": "skip_unrelated_email",
+                "other": "skip_unrelated_email"
             }
         )
 

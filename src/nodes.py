@@ -542,12 +542,16 @@ class Nodes:
         """Routes the email based on its category."""
         print(Fore.YELLOW + "Routing email based on category...\n" + Style.RESET_ALL)
         category = state["email_category"]
-        if category == "product_enquiry":
-            return "product related"
+        if category == "legal_contractDraftRequest":
+            return "contract draft request"
+        elif category == "contract_review":
+            return "contract review"
+        elif category == "legal_query":
+            return "legal query"
         elif category == "unrelated":
             return "unrelated"
         else:
-            return "not product related"
+            return "other"
 
     def construct_rag_queries(self, state: GraphState) -> GraphState:
         """Constructs RAG queries based on the email content."""

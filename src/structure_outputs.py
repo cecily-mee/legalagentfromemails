@@ -4,9 +4,9 @@ from enum import Enum
 
 # **Categorize Email Output**
 class EmailCategory(str, Enum):
-    product_enquiry = "product_enquiry"
-    customer_complaint = "customer_complaint"
-    customer_feedback = "customer_feedback"
+    legal_contractDraftRequest = "legal_contractDraftRequest"
+    contract_review = "contract_review"
+    legal_query = "legal_query"
     unrelated = "unrelated"
 
 class CategorizeEmailOutput(BaseModel):
