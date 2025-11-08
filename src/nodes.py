@@ -442,6 +442,8 @@ from colorama import Fore, Style
 from .agents import Agents
 from .tools.GmailTools import GmailToolsClass
 from .state import GraphState, Email
+import json
+import time
 
 ##CHANGE MADE##
 # Import SystemMessage, HumanMessage, and AIMessage to correctly build
@@ -493,6 +495,14 @@ class Nodes:
         # We also add a default empty list for 'attachment_images' just in case.
         emails = [Email(**{**email, 'attachment_images': email.get('attachment_images', [])}) for email in recent_emails]
         ##CHANGE MADE##
+        # Print a short summary of loaded emails for debugging (sender -> to)
+        for e in emails:
+            try:
+                print(Fore.CYAN + f"Loaded email: from={e.sender} to={getattr(e, 'to', '')} subject={e.subject}" + Style.RESET_ALL)
+            except Exception:
+                # Be robust if any field is missing
+                print(Fore.CYAN + f"Loaded email: summary unavailable" + Style.RESET_ALL)
+
         return {"emails": emails}
 
     def check_new_emails(self, state: GraphState) -> str:
@@ -517,8 +527,17 @@ class Nodes:
         ##CHANGE MADE##
         # We now build a multimodal prompt for the 'gemini' agent.
         
+        # Print current email details for debugging
+        try:
+            print(Fore.CYAN + f"Processing email now: from={current_email.sender} to={getattr(current_email,'to','')} subject={current_email.subject}" + Style.RESET_ALL)
+        except Exception:
+            pass
+
         # 1. Format the text part of the prompt
-        prompt_text = CATEGORIZE_EMAIL_PROMPT.format(email=current_email.body)
+        # Use simple replacement instead of str.format because the prompt
+        # contains literal JSON braces (e.g. {"category": "..."}) which
+        # would be interpreted as format placeholders and raise KeyError.
+        prompt_text = CATEGORIZE_EMAIL_PROMPT.replace("{email}", current_email.body)
         
         # 2. Build the full message content (text + images)
         message_content = self._build_multimodal_content(prompt_text, current_email)
@@ -527,15 +546,103 @@ class Nodes:
         prompt = HumanMessage(content=message_content)
 
         # 4. Invoke the agent. We wrap the single 'prompt' in a list []
-        #    to match what the model expects.
-        result = self.agents.categorize_email.invoke([prompt])
-        ##CHANGE MADE##
-        
-        print(Fore.MAGENTA + f"Email category: {result.category.value}" + Style.RESET_ALL)
-        
+        #    to match what the model expects. Add retries and robust parsing
+        #    so the pipeline doesn't crash on unexpected outputs.
+        max_attempts = 3
+        raw_result = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                raw_result = self.agents.categorize_email.invoke([prompt])
+            except Exception as e:
+                print(Fore.RED + f"Error invoking categorize_email agent (attempt {attempt}): {e}" + Style.RESET_ALL)
+                raw_result = None
+
+            # If we got something truthy, break and try to parse it
+            if raw_result:
+                break
+
+            # small backoff before retrying
+            if attempt < max_attempts:
+                time.sleep(0.5)
+
+        # Try to extract category from the agent result in several ways.
+        category_value = None
+
+        # 1) If the structured output is present with attribute 'category'
+        if raw_result is not None and hasattr(raw_result, 'category'):
+            try:
+                # Some structured wrappers expose `category` as an Enum-like
+                # object with a `value` attribute; others might be plain strings.
+                cat_attr = getattr(raw_result, 'category')
+                category_value = getattr(cat_attr, 'value', cat_attr)
+                if isinstance(category_value, bytes):
+                    category_value = category_value.decode('utf-8')
+            except Exception:
+                category_value = None
+
+        # 2) If the model returned a dict-like or simple mapping
+        if category_value is None:
+            try:
+                # Some runtimes return plain dicts
+                if isinstance(raw_result, dict):
+                    category_value = raw_result.get('category') or raw_result.get('label')
+            except Exception:
+                pass
+
+        # 3) If the model returned a string, try to parse JSON or match known keywords
+        if category_value is None and isinstance(raw_result, str):
+            # Try JSON parse first
+            try:
+                parsed = json.loads(raw_result)
+                if isinstance(parsed, dict):
+                    category_value = parsed.get('category') or parsed.get('label')
+            except Exception:
+                # not JSON; attempt simple substring matching for known categories
+                lowered = raw_result.lower()
+                for candidate in [
+                    'legal_contractdraftrequest', 'contractdraftrequest', 'contract draft request',
+                    'contract_review', 'contract review', 'legal_query', 'legal query',
+                    'unrelated', 'other'
+                ]:
+                    if candidate in lowered:
+                        category_value = candidate
+                        break
+
+        # Final fallback: if still unknown, log and set 'other'
+        if not category_value:
+            print(Fore.RED + "categorize_email returned no structured category after retries." + Style.RESET_ALL)
+            try:
+                print(Fore.RED + f"Raw agent result repr: {repr(raw_result)}" + Style.RESET_ALL)
+            except Exception:
+                pass
+            category_value = 'other'
+            print(Fore.MAGENTA + f"Email category: {category_value} (fallback)" + Style.RESET_ALL)
+            return {
+                'email_category': category_value,
+                'current_email': current_email
+            }
+
+        # Normalize some known variations to the enum-like values used elsewhere
+        normalized = str(category_value).strip()
+        normalized_map = {
+            'contract draft request': 'legal_contractDraftRequest',
+            'contractdraftrequest': 'legal_contractDraftRequest',
+            'legal_contractdraftrequest': 'legal_contractDraftRequest',
+            'contract review': 'contract_review',
+            'contract_review': 'contract_review',
+            'legal query': 'legal_query',
+            'legal_query': 'legal_query',
+            'unrelated': 'unrelated',
+            'other': 'other'
+        }
+        normalized_lower = normalized.lower()
+        final_category = normalized_map.get(normalized_lower, normalized)
+
+        print(Fore.MAGENTA + f"Email category: {final_category}" + Style.RESET_ALL)
+
         return {
-            "email_category": result.category.value,
-            "current_email": current_email
+            'email_category': final_category,
+            'current_email': current_email
         }
 
     def route_email_based_on_category(self, state: GraphState) -> str:
@@ -564,7 +671,8 @@ class Nodes:
         current_email = state["current_email"]
         
         # 2. Format the text part of the prompt
-        prompt_text = GENERATE_RAG_QUERIES_PROMPT.format(email=current_email.body)
+        # Use replace to avoid format() interpreting braces inside the prompt
+        prompt_text = GENERATE_RAG_QUERIES_PROMPT.replace("{email}", current_email.body)
         
         # 3. Build the full message content (text + images)
         message_content = self._build_multimodal_content(prompt_text, current_email)
@@ -645,10 +753,8 @@ class Nodes:
         current_email = state["current_email"]
         
         # 1. Format the text input
-        prompt_text = EMAIL_PROOFREADER_PROMPT.format(
-            initial_email=current_email.body,
-            generated_email=state["generated_email"]
-        )
+        # Use replace rather than format to avoid KeyError from literal braces
+        prompt_text = EMAIL_PROOFREADER_PROMPT.replace("{initial_email}", current_email.body).replace("{generated_email}", state["generated_email"])
         
         # 2. Build the multimodal content
         message_content = self._build_multimodal_content(prompt_text, current_email)
@@ -702,7 +808,33 @@ class Nodes:
     
     def skip_unrelated_email(self, state):
         """Skip unrelated email and remove from emails list."""
-        print("Skipping unrelated email...\n")
-        state["emails"].pop()
+        # Print which email is being skipped for easier debugging
+        current = None
+        if state.get("current_email"):
+            current = state.get("current_email")
+        elif state.get("emails"):
+            current = state["emails"][-1]
+
+        if current:
+            try:
+                print(Fore.YELLOW + f"Skipping unrelated email from={current.sender} to={getattr(current,'to','')} subject={current.subject}\n" + Style.RESET_ALL)
+            except Exception:
+                print(Fore.YELLOW + "Skipping unrelated email (summary unavailable)\n" + Style.RESET_ALL)
+
+            # Mark the message as read in Gmail so it won't be fetched again
+            try:
+                msg_id = getattr(current, 'id', None)
+                if msg_id:
+                    self.gmail_tools.mark_as_read(msg_id)
+            except Exception as e:
+                print(Fore.RED + f"Failed to mark message as read: {e}" + Style.RESET_ALL)
+
+        else:
+            print(Fore.YELLOW + "Skipping unrelated email...\n" + Style.RESET_ALL)
+
+        # Remove from local queue
+        if state.get("emails"):
+            state["emails"].pop()
+
         return state
     

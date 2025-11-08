@@ -363,7 +363,9 @@ class GmailToolsClass:
             before_timestamp = int(now.timestamp())
 
             # Query to get emails from the last 8 hours
-            query = f"after:{after_timestamp} before:{before_timestamp}"
+            # Only fetch messages in the inbox that are unread and not from our own address
+            my_email = os.environ.get('MY_EMAIL', '')
+            query = f"after:{after_timestamp} before:{before_timestamp} is:inbox is:unread -from:{my_email}"
             results = self.service.users().messages().list(
                 userId="me", q=query, maxResults=max_results
             ).execute()
@@ -394,6 +396,15 @@ class GmailToolsClass:
         except Exception as error:
             print(f"An error occurred while fetching drafts: {error}")
             return []
+
+    def mark_as_read(self, msg_id: str):
+        """Marks a specific email as read by removing the 'UNREAD' label."""
+        try:
+            body = {"removeLabelIds": ["UNREAD"]}
+            self.service.users().messages().modify(userId='me', id=msg_id, body=body).execute()
+            print(f"Marked email {msg_id} as read.")
+        except Exception as e:
+            print(f"Error marking email {msg_id} as read: {e}")
 
     def create_draft_reply(self, initial_email, reply_text):
         try:
@@ -478,7 +489,6 @@ class GmailToolsClass:
 
         payload = message.get('payload', {})
         headers = {header["name"].lower(): header["value"] for header in payload.get("headers", [])}
-
         ##CHANGE MADE##
         # We now call _get_email_body and our new _get_attachment_content function
         # to get the text body and a list of attachment images separately.
@@ -492,6 +502,7 @@ class GmailToolsClass:
             "messageId": headers.get("message-id"),
             "references": headers.get("references", ""),
             "sender": headers.get("from", "Unknown"),
+            "to": headers.get("to", ""),
             "subject": headers.get("subject", "No Subject"),
             ##CHANGE MADE##
             # We assign the variables to our new keys in the dictionary.

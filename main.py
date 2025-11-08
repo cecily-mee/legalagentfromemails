@@ -63,7 +63,8 @@ initial_state = {
       "body": "",
       ##CHANGE MADE##
       # We must add the new field from the Email schema to the initial state
-      "attachment_images": []
+      "attachment_images": [],
+      "to": ""
       ##CHANGE MADE##
     },
     "email_category": "",

@@ -8,6 +8,17 @@ CATEGORIZE_EMAIL_PROMPT = """
 # **Notes:**
 
 * Base your categorization strictly on the email content provided; avoid making assumptions or overgeneralizing.
+
+---
+
+IMPORTANT: Return only a JSON object (no additional text) with a single field named "category" whose value MUST be one of the following exact strings:
+`legal_contractDraftRequest`, `contract_review`, `legal_query`, `unrelated`, or `other`.
+
+Example (exactly):
+```
+{"category": "legal_contractDraftRequest"}
+```
+If you cannot determine a category, return `{"category": "other"}`.
 """
 
 # Design RAG queries prompt template

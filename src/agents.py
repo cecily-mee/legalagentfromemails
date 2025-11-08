@@ -94,12 +94,13 @@ class Agents():
         ##CHANGE MADE##
         # Llama is still here for our text-only RAG agent
         llama = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.1)
-    # Gemini will be used for all email-processing (multimodal) agents
-    # Use a supported model name. 'gemini-pro-vision' is not available
-    # for the v1beta generative API (causes 404). Fall back to a known
-    # available model like 'gemini-1.5-flash' (adjust if your account
-    # has different permitted models).
-        gemini = ChatGoogleGenerativeAI(model="gemini-flash-latest", temperature=0.1)
+        # Gemini will be used for all email-processing (multimodal) agents
+        # Use a supported model name. 'gemini-pro-vision' is not available
+        # for the v1beta generative API (causes 404). Fall back to a known
+        # available model like 'gemini-1.5-flash' (adjust if your account
+        # has different permitted models).
+        # Use deterministic, low-temperature generation for classification and structured output
+        gemini = ChatGoogleGenerativeAI(model="gemini-flash-latest", temperature=0.0)
         ##CHANGE MADE##
         
         # QA assistant chat

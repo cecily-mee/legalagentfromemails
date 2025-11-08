@@ -34,6 +34,7 @@ class Email(BaseModel):
     messageId: str = Field(..., description="Message identifier of the email")
     references: str = Field(..., description="References of the email")
     sender: str = Field(..., description="Email address of the sender")
+    to: str = Field(..., description="Recipient(s) of the email")
     subject: str = Field(..., description="Subject line of the email")
     body: str = Field(..., description="Body content of the email")
     ##CHANGE MADE##
