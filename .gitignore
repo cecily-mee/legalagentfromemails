@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Credentials and tokens
+*.env
+*.env.*
+*.secret
+*.token
+credentials.json
+token.json
+
+# Database
+*.sqlite3
+
+# Logs
+*.log
+
+# Other
+*.bak
+*.swp
+
+# Ignore data and db folders if needed
+data/
+# db/
